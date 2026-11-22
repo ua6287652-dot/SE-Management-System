@@ -1,0 +1,470 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Semester Management</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+  <style>
+    body {
+      background: #f4f6f9;
+      font-family: Arial, sans-serif;
+    }
+
+    .sidebar {
+      min-height: 100vh;
+      background: #172554;
+      padding: 25px 15px;
+    }
+
+    .sidebar a {
+      display: block;
+      color: white;
+      text-decoration: none;
+      padding: 12px;
+      border-radius: 7px;
+      margin-bottom: 7px;
+    }
+
+    .sidebar a:hover,
+    .sidebar a.active {
+      background: #2563eb;
+    }
+
+    .main-content {
+      padding: 30px;
+    }
+
+    .card {
+      border: none;
+      border-radius: 12px;
+      box-shadow: 0 3px 12px rgba(0,0,0,.06);
+    }
+
+    .table th {
+      background: #eef2ff;
+    }
+  </style>
+</head>
+
+<body>
+<div class="container-fluid">
+  <div class="row">
+
+    <aside class="col-md-2 sidebar">
+      <h4 class="text-white mb-4">SE Department</h4>
+
+      <a href="dashboard.html"><i class="bi bi-speedometer2"></i> Dashboard</a>
+      <a href="students.html"><i class="bi bi-people"></i> Students</a>
+      <a href="teachers.html"><i class="bi bi-person-badge"></i> Teachers</a>
+      <a href="courses.html"><i class="bi bi-book"></i> Courses</a>
+      <a href="attendance.html"><i class="bi bi-calendar-check"></i> Attendance</a>
+      <a href="marks-results.html"><i class="bi bi-award"></i> Marks & Results</a>
+      <a href="fees.html"><i class="bi bi-cash-stack"></i> Fees</a>
+      <a href="semesters.html" class="active"><i class="bi bi-layers"></i> Semesters</a>
+    </aside>
+
+    <main class="col-md-10 main-content">
+
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h2>Semester Management</h2>
+          <p class="text-muted">Manage Software Engineering semesters</p>
+        </div>
+
+        <button class="btn btn-danger" id="logoutBtn">
+          <i class="bi bi-box-arrow-right"></i> Logout
+        </button>
+      </div>
+
+      <div id="message"></div>
+
+      <div class="row g-3 mb-4">
+        <div class="col-md-4">
+          <div class="card p-3">
+            <p class="text-muted mb-1">Total Semesters</p>
+            <h3 id="totalSemesters">0</h3>
+          </div>
+        </div>
+
+        <div class="col-md-4">
+          <div class="card p-3">
+            <p class="text-muted mb-1">Departments</p>
+            <h3 id="totalDepartments">0</h3>
+          </div>
+        </div>
+
+        <div class="col-md-4">
+          <div class="card p-3">
+            <p class="text-muted mb-1">Highest Semester</p>
+            <h3 id="highestSemester">0</h3>
+          </div>
+        </div>
+      </div>
+
+      <div class="card p-4 mb-4">
+        <h5 class="mb-3" id="formHeading">Add New Semester</h5>
+
+        <form id="semesterForm">
+          <input type="hidden" id="semester_id">
+
+          <div class="row g-3">
+
+            <div class="col-md-4">
+              <label class="form-label">Department</label>
+              <select id="department_id" class="form-select" required>
+                <option value="">Select Department</option>
+              </select>
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">Semester Number</label>
+              <select id="semester_number" class="form-select" required>
+                <option value="">Select Semester</option>
+                <option value="1">Semester 1</option>
+                <option value="2">Semester 2</option>
+                <option value="3">Semester 3</option>
+                <option value="4">Semester 4</option>
+                <option value="5">Semester 5</option>
+                <option value="6">Semester 6</option>
+                <option value="7">Semester 7</option>
+                <option value="8">Semester 8</option>
+              </select>
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">Semester Name</label>
+              <input
+                type="text"
+                id="semester_name"
+                class="form-control"
+                placeholder="e.g. Semester 1"
+                required
+              >
+            </div>
+
+          </div>
+
+          <button type="submit" class="btn btn-primary mt-3" id="saveBtn">
+            <i class="bi bi-save"></i> Save Semester
+          </button>
+
+          <button type="button" class="btn btn-secondary mt-3" id="clearBtn">
+            Clear
+          </button>
+        </form>
+      </div>
+
+      <div class="card p-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5>All Semesters</h5>
+          <input
+            type="text"
+            id="searchSemester"
+            class="form-control"
+            style="max-width: 280px"
+            placeholder="Search semester..."
+          >
+        </div>
+
+        <div class="table-responsive">
+          <table class="table table-bordered table-hover">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Semester Number</th>
+                <th>Semester Name</th>
+                <th>Department</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+
+            <tbody id="semesterTable">
+              <tr>
+                <td colspan="5" class="text-center">Loading...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script type="module">
+import { supabase } from './js/supabase.js';
+
+const $ = id => document.getElementById(id);
+
+let semesters = [];
+let departments = [];
+
+function escapeHTML(value) {
+  return String(value ?? '').replace(/[&<>"']/g, char => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  })[char]);
+}
+
+function showMessage(message, type = 'danger') {
+  $('message').innerHTML =
+    `<div class="alert alert-${type}">${escapeHTML(message)}</div>`;
+}
+
+async function checkAuth() {
+  const { data: { user }, error } = await supabase.auth.getUser();
+
+  if (error || !user) {
+    window.location.href = 'login.html';
+    return false;
+  }
+
+  const { data: profile, error: profileError } = await supabase
+    .from('user_profiles')
+    .select('role')
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (profileError || profile?.role !== 'admin') {
+    showMessage('Admin access required.');
+    return false;
+  }
+
+  return true;
+}
+
+async function loadDepartments() {
+  const { data, error } = await supabase
+    .from('departments')
+    .select('department_id, department_name')
+    .order('department_name');
+
+  if (error) throw error;
+
+  departments = data || [];
+
+  $('department_id').innerHTML =
+    '<option value="">Select Department</option>' +
+    departments.map(d => `
+      <option value="${d.department_id}">
+        ${escapeHTML(d.department_name)}
+      </option>
+    `).join('');
+
+  $('totalDepartments').textContent = departments.length;
+}
+
+async function loadSemesters() {
+  const { data, error } = await supabase
+    .from('semesters')
+    .select('semester_id, department_id, semester_number, semester_name')
+    .order('semester_number');
+
+  if (error) throw error;
+
+  semesters = data || [];
+
+  renderSemesters();
+  updateStats();
+}
+
+function renderSemesters() {
+  const search = $('searchSemester').value.toLowerCase();
+
+  const filtered = semesters.filter(s => {
+    const department = departments.find(
+      d => d.department_id === s.department_id
+    );
+
+    return String(s.semester_name || '').toLowerCase().includes(search) ||
+      String(s.semester_number).includes(search) ||
+      String(department?.department_name || '').toLowerCase().includes(search);
+  });
+
+  if (!filtered.length) {
+    $('semesterTable').innerHTML =
+      '<tr><td colspan="5" class="text-center">No semesters found.</td></tr>';
+    return;
+  }
+
+  $('semesterTable').innerHTML = filtered.map((s, index) => {
+    const department = departments.find(
+      d => d.department_id === s.department_id
+    );
+
+    return `
+      <tr>
+        <td>${index + 1}</td>
+        <td>Semester ${escapeHTML(s.semester_number)}</td>
+        <td>${escapeHTML(s.semester_name)}</td>
+        <td>${escapeHTML(department?.department_name || 'Unknown')}</td>
+        <td>
+          <button
+            class="btn btn-sm btn-primary edit-btn"
+            data-id="${s.semester_id}">
+            <i class="bi bi-pencil"></i> Edit
+          </button>
+
+          <button
+            class="btn btn-sm btn-danger delete-btn"
+            data-id="${s.semester_id}">
+            <i class="bi bi-trash"></i> Delete
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function updateStats() {
+  $('totalSemesters').textContent = semesters.length;
+
+  const highest = semesters.reduce(
+    (max, s) => Math.max(max, Number(s.semester_number) || 0),
+    0
+  );
+
+  $('highestSemester').textContent =
+    highest ? 'Semester ' + highest : '0';
+}
+
+function resetForm() {
+  $('semesterForm').reset();
+  $('semester_id').value = '';
+  $('formHeading').textContent = 'Add New Semester';
+  $('saveBtn').innerHTML = '<i class="bi bi-save"></i> Save Semester';
+}
+
+$('semesterForm').addEventListener('submit', async e => {
+  e.preventDefault();
+
+  const id = $('semester_id').value;
+
+  const record = {
+    department_id: $('department_id').value,
+    semester_number: Number($('semester_number').value),
+    semester_name: $('semester_name').value.trim()
+  };
+
+  if (!record.department_id || !record.semester_number ||
+      !record.semester_name) {
+    showMessage('Please fill in all fields.');
+    return;
+  }
+
+  const duplicate = semesters.find(s =>
+    s.department_id === record.department_id &&
+    Number(s.semester_number) === record.semester_number &&
+    s.semester_id !== id
+  );
+
+  if (duplicate) {
+    showMessage('This semester number already exists in this department.');
+    return;
+  }
+
+  try {
+    const { error } = id
+      ? await supabase.from('semesters').update(record)
+          .eq('semester_id', id)
+      : await supabase.from('semesters').insert(record);
+
+    if (error) throw error;
+
+    showMessage(
+      id ? 'Semester updated successfully!' : 'Semester added successfully!',
+      'success'
+    );
+
+    resetForm();
+    await loadSemesters();
+
+  } catch (error) {
+    showMessage('Save error: ' + error.message);
+  }
+});
+
+$('semesterTable').addEventListener('click', async e => {
+  const editButton = e.target.closest('.edit-btn');
+  const deleteButton = e.target.closest('.delete-btn');
+
+  if (editButton) {
+    const semester = semesters.find(
+      s => s.semester_id === editButton.dataset.id
+    );
+
+    if (!semester) return;
+
+    $('semester_id').value = semester.semester_id;
+    $('department_id').value = semester.department_id;
+    $('semester_number').value = semester.semester_number;
+    $('semester_name').value = semester.semester_name;
+
+    $('formHeading').textContent = 'Edit Semester';
+    $('saveBtn').innerHTML = '<i class="bi bi-pencil"></i> Update Semester';
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  if (deleteButton) {
+    const id = deleteButton.dataset.id;
+
+    if (!confirm(
+      'Are you sure you want to delete this semester? ' +
+      'It may be linked to students or courses.'
+    )) return;
+
+    try {
+      const { error } = await supabase
+        .from('semesters')
+        .delete()
+        .eq('semester_id', id);
+
+      if (error) throw error;
+
+      showMessage('Semester deleted successfully.', 'success');
+      resetForm();
+      await loadSemesters();
+
+    } catch (error) {
+      showMessage(
+        'Delete error: ' + error.message +
+        ' This semester may be in use by students or courses.'
+      );
+    }
+  }
+});
+
+$('searchSemester').addEventListener('input', renderSemesters);
+$('clearBtn').addEventListener('click', resetForm);
+
+$('logoutBtn').addEventListener('click', async () => {
+  await supabase.auth.signOut();
+  window.location.href = 'login.html';
+});
+
+async function init() {
+  try {
+    if (!await checkAuth()) return;
+
+    await loadDepartments();
+    await loadSemesters();
+
+  } catch (error) {
+    showMessage('Loading error: ' + error.message);
+  }
+}
+
+init();
+</script>
+
+</body>
+</html>

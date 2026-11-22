@@ -1,0 +1,442 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Student Management | SE Management</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background:#f4f6fa; }
+    .header { background:#12345a; color:white; padding:22px; }
+    .card { border:0; border-radius:12px; box-shadow:0 3px 15px #0000000b; }
+    .table th { background:#eaf0f7; white-space:nowrap; }
+    .form-label { font-weight:600; }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <div class="container-fluid d-flex justify-content-between align-items-center">
+    <div>
+      <h2 class="mb-1">Student Management</h2>
+      <div>Software Engineering Department</div>
+    </div>
+    <a href="dashboard.html" class="btn btn-light">Back to Dashboard</a>
+  </div>
+</header>
+
+<main class="container-fluid p-4">
+  <div id="message"></div>
+
+  <div class="card p-4 mb-4">
+    <h4 id="formHeading">Add New Student</h4>
+    <form id="studentForm">
+      <input type="hidden" id="studentId">
+
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">Roll Number *</label>
+          <input id="roll_no" class="form-control" required>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Full Name *</label>
+          <input id="full_name" class="form-control" required>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Email</label>
+          <input id="email" type="email" class="form-control">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Phone</label>
+          <input id="phone" class="form-control">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Gender</label>
+          <select id="gender" class="form-select">
+            <option value="">Select Gender</option>
+            <option>Male</option>
+            <option>Female</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Date of Birth</label>
+          <input id="date_of_birth" type="date" class="form-control">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Department *</label>
+          <select id="department_id" class="form-select" required>
+            <option value="">Loading departments...</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Semester *</label>
+          <select id="current_semester_id" class="form-select" required>
+            <option value="">Select department first</option>
+          </select>
+        </div>
+        <div class="col-md-4" id="termField">
+          <label class="form-label">Academic Term *</label>
+          <select id="academic_term_id" class="form-select" required>
+            <option value="">Loading terms...</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Admission Date</label>
+          <input id="admission_date" type="date" class="form-control">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Address</label>
+          <input id="address" class="form-control">
+        </div>
+      </div>
+
+      <div class="mt-4">
+        <button type="submit" class="btn btn-primary" id="saveBtn">Save Student</button>
+        <button type="button" class="btn btn-secondary" id="cancelBtn" hidden>Cancel Edit</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card p-4">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+      <h4 class="mb-0">Students List</h4>
+      <input id="searchInput" class="form-control" style="max-width:300px"
+             placeholder="Search name or roll number...">
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover align-middle">
+        <thead>
+          <tr>
+            <th>Roll No</th>
+            <th>Full Name</th>
+            <th>Email</th>
+            <th>Phone</th>
+            <th>Department</th>
+            <th>Semester</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="studentsTable">
+          <tr><td colspan="8" class="text-center">Loading students...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<script type="module">
+import { supabase } from './js/supabase.js';
+
+const $ = id => document.getElementById(id);
+
+let students = [];
+let departments = [];
+let semesters = [];
+let terms = [];
+
+function showMessage(message, type = 'success') {
+  $('message').innerHTML = `
+    <div class="alert alert-${type} alert-dismissible fade show">
+      ${message}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>`;
+}
+
+async function initialize() {
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    window.location.href = 'login.html';
+    return;
+  }
+
+ await Promise.all([
+  loadDepartments(),
+  loadTerms()
+]);
+
+if (departments.length) {
+  await loadSemesters(departments[0].department_id);
+}
+
+await loadStudents();
+}
+
+async function loadDepartments() {
+  const { data, error } = await supabase
+    .from('departments')
+    .select('department_id, department_name, department_code')
+    .order('department_name');
+
+  if (error) throw error;
+  departments = data || [];
+
+  $('department_id').innerHTML =
+    '<option value="">Select Department</option>' +
+    departments.map(d =>
+      `<option value="${d.department_id}">${d.department_name} (${d.department_code})</option>`
+    ).join('');
+}
+
+async function loadTerms() {
+  const { data, error } = await supabase
+    .from('academic_terms')
+    .select('academic_term_id, academic_year, term_name, status')
+    .order('start_date', { ascending: false });
+
+  if (error) throw error;
+  terms = data || [];
+
+  $('academic_term_id').innerHTML =
+    '<option value="">Select Academic Term</option>' +
+    terms.map(t =>
+      `<option value="${t.academic_term_id}">${t.term_name} ${t.academic_year} (${t.status || 'Term'})</option>`
+    ).join('');
+}
+
+async function loadSemesters(departmentId, selectedId = '') {
+  $('current_semester_id').innerHTML =
+    '<option value="">Loading semesters...</option>';
+
+  if (!departmentId) {
+    $('current_semester_id').innerHTML =
+      '<option value="">Select department first</option>';
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from('semesters')
+    .select('semester_id, semester_number, semester_name')
+    .eq('department_id', departmentId)
+    .order('semester_number');
+
+  if (error) throw error;
+  semesters = data || [];
+
+  $('current_semester_id').innerHTML =
+    '<option value="">Select Semester</option>' +
+    semesters.map(s =>
+      `<option value="${s.semester_id}">${s.semester_name || 'Semester ' + s.semester_number}</option>`
+    ).join('');
+
+  $('current_semester_id').value = selectedId;
+}
+
+async function loadStudents() {
+  $('studentsTable').innerHTML =
+    '<tr><td colspan="8" class="text-center">Loading...</td></tr>';
+
+  const { data, error } = await supabase
+    .from('students')
+    .select('student_id, department_id, current_semester_id, roll_no, full_name, email, phone, gender, date_of_birth, address, admission_date, status')
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  students = data || [];
+  renderStudents();
+}
+
+function renderStudents() {
+  const search = $('searchInput').value.toLowerCase();
+
+  const filtered = students.filter(s =>
+    (s.full_name || '').toLowerCase().includes(search) ||
+    (s.roll_no || '').toLowerCase().includes(search)
+  );
+
+  if (!filtered.length) {
+    $('studentsTable').innerHTML =
+      '<tr><td colspan="8" class="text-center">No students found.</td></tr>';
+    return;
+  }
+
+  $('studentsTable').innerHTML = filtered.map(s => {
+    const dept = departments.find(d => d.department_id === s.department_id);
+    const sem = semesters.find(x => x.semester_id === s.current_semester_id);
+
+    return `
+      <tr>
+        <td>${escapeHTML(s.roll_no)}</td>
+        <td>${escapeHTML(s.full_name)}</td>
+        <td>${escapeHTML(s.email || '-')}</td>
+        <td>${escapeHTML(s.phone || '-')}</td>
+        <td>${escapeHTML(dept?.department_name || '-')}</td>
+        <td>${escapeHTML(sem?.semester_name || (sem ? 'Semester ' + sem.semester_number : '-'))}</td>
+        <td>${escapeHTML(s.status || 'Active')}</td>
+        <td>
+          <button class="btn btn-sm btn-warning me-1" data-edit="${s.student_id}">Edit</button>
+          <button class="btn btn-sm btn-danger" data-delete="${s.student_id}">Delete</button>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+function escapeHTML(value) {
+  return String(value ?? '').replace(/[&<>"']/g, char => ({
+    '&':'&amp;', '<':'&lt;', '>':'&gt;',
+    '"':'&quot;', "'":'&#039;'
+  })[char]);
+}
+
+$('department_id').addEventListener('change', async () => {
+  try {
+    await loadSemesters($('department_id').value);
+  } catch (error) {
+    showMessage(error.message, 'danger');
+  }
+});
+
+$('studentForm').addEventListener('submit', async event => {
+  event.preventDefault();
+
+  const id = $('studentId').value;
+  const payload = {
+    department_id: $('department_id').value,
+    current_semester_id: $('current_semester_id').value,
+    roll_no: $('roll_no').value.trim(),
+    full_name: $('full_name').value.trim(),
+    email: $('email').value.trim() || null,
+    phone: $('phone').value.trim() || null,
+    gender: $('gender').value || null,
+    date_of_birth: $('date_of_birth').value || null,
+    address: $('address').value.trim() || null,
+    admission_date: $('admission_date').value || null
+  };
+
+  if (!id && !$('academic_term_id').value) {
+    showMessage('Please select an academic term.', 'warning');
+    return;
+  }
+
+  $('saveBtn').disabled = true;
+
+  try {
+    if (id) {
+      const { error } = await supabase
+        .from('students')
+        .update(payload)
+        .eq('student_id', id);
+
+      if (error) throw error;
+      showMessage('Student updated successfully.');
+    } else {
+      const { data: newStudent, error } = await supabase
+        .from('students')
+        .insert({ ...payload, status: 'Active' })
+        .select('student_id')
+        .single();
+
+      if (error) throw error;
+
+      const { error: historyError } = await supabase
+        .from('student_semester_history')
+        .insert({
+          student_id: newStudent.student_id,
+          semester_id: payload.current_semester_id,
+          academic_term_id: $('academic_term_id').value,
+          status: 'Active',
+          start_date: payload.admission_date || new Date().toISOString().slice(0, 10)
+        });
+
+      if (historyError) {
+        showMessage(
+          'Student record was added, but semester history could not be saved: ' +
+          historyError.message,
+          'warning'
+        );
+      } else {
+        showMessage('Student and semester history added successfully.');
+      }
+    }
+
+    resetForm();
+    await loadStudents();
+  } catch (error) {
+    showMessage('Error: ' + error.message, 'danger');
+  } finally {
+    $('saveBtn').disabled = false;
+  }
+});
+
+$('studentsTable').addEventListener('click', async event => {
+  const editId = event.target.dataset.edit;
+  const deleteId = event.target.dataset.delete;
+
+  if (editId) {
+    const s = students.find(x => x.student_id === editId);
+    if (!s) return;
+
+    $('studentId').value = s.student_id;
+    $('roll_no').value = s.roll_no || '';
+    $('full_name').value = s.full_name || '';
+    $('email').value = s.email || '';
+    $('phone').value = s.phone || '';
+    $('gender').value = s.gender || '';
+    $('date_of_birth').value = s.date_of_birth || '';
+    $('address').value = s.address || '';
+    $('admission_date').value = s.admission_date || '';
+    $('department_id').value = s.department_id;
+
+    try {
+      await loadSemesters(s.department_id, s.current_semester_id);
+    } catch (error) {
+      showMessage(error.message, 'danger');
+      return;
+    }
+
+    $('termField').hidden = true;
+    $('academic_term_id').required = false;
+    $('formHeading').textContent = 'Edit Student';
+    $('saveBtn').textContent = 'Update Student';
+    $('cancelBtn').hidden = false;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  if (deleteId) {
+    const student = students.find(x => x.student_id === deleteId);
+    if (!student) return;
+
+    if (!confirm(`Mark ${student.full_name} as Dropped?`)) return;
+
+    const { error } = await supabase
+      .from('students')
+      .update({ status: 'Dropped' })
+      .eq('student_id', deleteId);
+
+    if (error) {
+      showMessage(error.message, 'danger');
+    } else {
+      showMessage('Student marked as Dropped.');
+      await loadStudents();
+    }
+  }
+});
+
+function resetForm() {
+  $('studentForm').reset();
+  $('studentId').value = '';
+  $('current_semester_id').innerHTML =
+    '<option value="">Select department first</option>';
+  $('termField').hidden = false;
+  $('academic_term_id').required = true;
+  $('formHeading').textContent = 'Add New Student';
+  $('saveBtn').textContent = 'Save Student';
+  $('cancelBtn').hidden = true;
+}
+
+$('cancelBtn').addEventListener('click', resetForm);
+$('searchInput').addEventListener('input', renderStudents);
+
+try {
+  await initialize();
+} catch (error) {
+  showMessage('Page loading error: ' + error.message, 'danger');
+}
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

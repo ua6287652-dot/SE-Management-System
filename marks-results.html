@@ -1,0 +1,524 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Marks & Results | SE Management</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <style>
+    body { background: #f4f6fa; }
+    .header { background: #12345a; color: white; padding: 22px; }
+    .card { border: 0; border-radius: 12px; box-shadow: 0 3px 15px #0000000b; }
+    .table th { background: #eaf0f7; white-space: nowrap; }
+    .form-label { font-weight: 600; }
+    .marks-input { min-width: 85px; }
+  </style>
+</head>
+
+<body>
+
+<header class="header">
+  <div class="container-fluid d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div>
+      <h2 class="mb-1">Marks & Results Management</h2>
+      <div>Software Engineering Department</div>
+    </div>
+    <a href="dashboard.html" class="btn btn-light">Back to Dashboard</a>
+  </div>
+</header>
+
+<main class="container-fluid p-4">
+
+  <div id="message" aria-live="polite"></div>
+
+  <div class="card p-4 mb-4">
+    <h4 class="mb-3">Select Course</h4>
+
+    <div class="row g-3">
+      <div class="col-md-8">
+        <label class="form-label">Course *</label>
+        <select id="courseSelect" class="form-select">
+          <option value="">Loading courses...</option>
+        </select>
+      </div>
+
+      <div class="col-md-4 d-flex align-items-end">
+        <button id="loadBtn" class="btn btn-primary w-100">
+          Load Students
+        </button>
+      </div>
+    </div>
+
+    <div class="form-text mt-2">
+      Default maximum marks: Assignment 10, Midterm 30, Final 60.
+      You can change these values before saving.
+    </div>
+  </div>
+
+  <div class="card p-4">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+      <div>
+        <h4 class="mb-1">Student Marks</h4>
+        <small class="text-muted" id="courseInfo">
+          Select a course to load enrolled students.
+        </small>
+      </div>
+
+      <input id="searchInput" class="form-control"
+             style="max-width:260px" placeholder="Search student...">
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-hover align-middle">
+        <thead>
+          <tr>
+            <th>Roll No</th>
+            <th>Student Name</th>
+            <th>Assignment<br><small>Obtained / Total</small></th>
+            <th>Midterm<br><small>Obtained / Total</small></th>
+            <th>Final<br><small>Obtained / Total</small></th>
+            <th>Total</th>
+            <th>Percentage</th>
+            <th>Grade</th>
+            <th>Result</th>
+          </tr>
+        </thead>
+
+        <tbody id="marksTable">
+          <tr>
+            <td colspan="9" class="text-center">
+              Select a course and load students.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3">
+      <small id="studentCount" class="text-muted">Total Students: 0</small>
+
+      <button id="saveBtn" class="btn btn-success" disabled>
+        Save Marks & Results
+      </button>
+    </div>
+  </div>
+
+</main>
+
+<script type="module">
+import { supabase } from './js/supabase.js';
+
+const $ = id => document.getElementById(id);
+
+let courses = [];
+let students = [];
+
+function escapeHTML(value) {
+  return String(value ?? '').replace(/[&<>"']/g, char => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  })[char]);
+}
+
+function showMessage(message, type = 'success') {
+  $('message').innerHTML = `
+    <div class="alert alert-${type} alert-dismissible fade show">
+      ${escapeHTML(message)}
+      <button type="button" class="btn-close"
+              data-bs-dismiss="alert"></button>
+    </div>`;
+}
+
+function gradeFor(percentage) {
+  if (percentage >= 80) return 'A';
+  if (percentage >= 70) return 'B';
+  if (percentage >= 60) return 'C';
+  if (percentage >= 50) return 'D';
+  if (percentage >= 40) return 'E';
+  return 'F';
+}
+
+function calculate(student) {
+  const types = ['Assignment', 'Midterm', 'Final'];
+
+  let total = 0;
+  let obtained = 0;
+
+  for (const type of types) {
+    const item = student.marks[type];
+    total += Number(item.total || 0);
+    obtained += Number(item.obtained || 0);
+  }
+
+  const percentage = total > 0
+    ? (obtained / total) * 100
+    : 0;
+
+  return {
+    total,
+    obtained,
+    percentage,
+    grade: gradeFor(percentage),
+    status: percentage >= 40 ? 'Pass' : 'Fail'
+  };
+}
+
+async function initialize() {
+  const { data: { user }, error } = await supabase.auth.getUser();
+
+  if (error || !user) {
+    window.location.href = 'login.html';
+    return;
+  }
+
+  await loadCourses();
+}
+
+async function loadCourses() {
+  const { data, error } = await supabase
+    .from('courses')
+    .select('course_id, course_code, course_name')
+    .order('course_code');
+
+  if (error) throw error;
+
+  courses = data || [];
+
+  $('courseSelect').innerHTML =
+    '<option value="">Select Course</option>' +
+    courses.map(c => `
+      <option value="${c.course_id}">
+        ${escapeHTML(c.course_code)} - ${escapeHTML(c.course_name)}
+      </option>
+    `).join('');
+}
+
+async function loadStudents() {
+  const courseId = $('courseSelect').value;
+
+  if (!courseId) {
+    showMessage('Please select a course.', 'warning');
+    return;
+  }
+
+  $('loadBtn').disabled = true;
+  $('marksTable').innerHTML =
+    '<tr><td colspan="9" class="text-center">Loading...</td></tr>';
+
+  try {
+    const { data: enrollments, error: enrollmentError } =
+      await supabase
+        .from('enrollments')
+        .select('enrollment_id, history_id')
+        .eq('course_id', courseId)
+        .eq('status', 'Active');
+
+    if (enrollmentError) throw enrollmentError;
+
+    if (!enrollments?.length) {
+      students = [];
+      renderStudents();
+      $('courseInfo').textContent =
+        'No active students enrolled in this course.';
+      return;
+    }
+
+    const historyIds = [
+      ...new Set(enrollments.map(e => e.history_id))
+    ];
+
+    const { data: histories, error: historyError } =
+      await supabase
+        .from('student_semester_history')
+        .select('history_id, student_id')
+        .in('history_id', historyIds);
+
+    if (historyError) throw historyError;
+
+    const studentIds = [
+      ...new Set((histories || []).map(h => h.student_id))
+    ];
+
+    const { data: studentData, error: studentError } =
+      await supabase
+        .from('students')
+        .select('student_id, roll_no, full_name')
+        .in('student_id', studentIds)
+        .order('roll_no');
+
+    if (studentError) throw studentError;
+
+    const enrollmentIds = enrollments.map(e => e.enrollment_id);
+
+    const { data: marksData, error: marksError } =
+      await supabase
+        .from('assessment_marks')
+        .select('enrollment_id, assessment_type, total_marks, obtained_marks')
+        .in('enrollment_id', enrollmentIds);
+
+    if (marksError) throw marksError;
+
+    const { data: resultsData, error: resultsError } =
+      await supabase
+        .from('student_course_results')
+        .select('enrollment_id, total_marks, obtained_marks, percentage, grade, status')
+        .in('enrollment_id', enrollmentIds);
+
+    if (resultsError) throw resultsError;
+
+    students = enrollments.map(enrollment => {
+      const history = histories.find(
+        h => h.history_id === enrollment.history_id
+      );
+
+      const student = (studentData || []).find(
+        s => s.student_id === history?.student_id
+      );
+
+      const savedMarks = (marksData || []).filter(
+        m => m.enrollment_id === enrollment.enrollment_id
+      );
+
+      const marks = {
+        Assignment: { total: 10, obtained: 0 },
+        Midterm: { total: 30, obtained: 0 },
+        Final: { total: 60, obtained: 0 }
+      };
+
+      savedMarks.forEach(m => {
+        marks[m.assessment_type] = {
+          total: Number(m.total_marks),
+          obtained: Number(m.obtained_marks)
+        };
+      });
+
+      const savedResult = (resultsData || []).find(
+        r => r.enrollment_id === enrollment.enrollment_id
+      );
+
+      return {
+        enrollment_id: enrollment.enrollment_id,
+        roll_no: student?.roll_no || '',
+        full_name: student?.full_name || 'Unknown Student',
+        marks,
+        savedResult
+      };
+    }).filter(s => s.full_name !== 'Unknown Student');
+
+    renderStudents();
+
+    const course = courses.find(c =>
+      String(c.course_id) === String(courseId)
+    );
+
+    $('courseInfo').textContent =
+      `${course?.course_code || ''} - ${course?.course_name || ''}`;
+
+  } catch (error) {
+    students = [];
+    renderStudents();
+    showMessage('Loading error: ' + error.message, 'danger');
+  } finally {
+    $('loadBtn').disabled = false;
+  }
+}
+
+function renderStudents() {
+  const search = $('searchInput').value.toLowerCase();
+
+  const filtered = students.filter(s =>
+    [s.roll_no, s.full_name].some(value =>
+      String(value || '').toLowerCase().includes(search)
+    )
+  );
+
+  $('studentCount').textContent =
+    `Total Students: ${students.length}`;
+
+  $('saveBtn').disabled = students.length === 0;
+
+  if (!filtered.length) {
+    $('marksTable').innerHTML = `
+      <tr><td colspan="9" class="text-center">
+        No students found.
+      </td></tr>`;
+    return;
+  }
+
+  $('marksTable').innerHTML = filtered.map(s => {
+    const result = calculate(s);
+
+    return `
+      <tr data-id="${escapeHTML(s.enrollment_id)}">
+        <td>${escapeHTML(s.roll_no)}</td>
+        <td>${escapeHTML(s.full_name)}</td>
+
+        ${['Assignment', 'Midterm', 'Final'].map(type => `
+          <td>
+            <div class="d-flex gap-1">
+              <input type="number" min="0" step="0.01"
+                class="form-control marks-input obtained"
+                data-type="${type}"
+                value="${s.marks[type].obtained}"
+                title="Obtained marks">
+
+              <span class="pt-2">/</span>
+
+              <input type="number" min="0.01" step="0.01"
+                class="form-control marks-input maximum"
+                data-type="${type}"
+                value="${s.marks[type].total}"
+                title="Total marks">
+            </div>
+          </td>
+        `).join('')}
+
+        <td class="total-cell">${result.obtained} / ${result.total}</td>
+        <td class="percentage-cell">${result.percentage.toFixed(2)}%</td>
+        <td class="grade-cell">${result.grade}</td>
+        <td class="status-cell">
+          <span class="badge ${result.status === 'Pass' ? 'bg-success' : 'bg-danger'}">
+            ${result.status}
+          </span>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+function readInputs() {
+  const rows = [
+    ...$('marksTable').querySelectorAll('tr[data-id]')
+  ];
+
+  for (const row of rows) {
+    const student = students.find(
+      s => String(s.enrollment_id) === row.dataset.id
+    );
+
+    if (!student) continue;
+
+    for (const type of ['Assignment', 'Midterm', 'Final']) {
+      const obtained = Number(
+        row.querySelector(`.obtained[data-type="${type}"]`).value
+      );
+
+      const total = Number(
+        row.querySelector(`.maximum[data-type="${type}"]`).value
+      );
+
+      if (
+        !Number.isFinite(obtained) ||
+        !Number.isFinite(total) ||
+        total <= 0 ||
+        obtained < 0 ||
+        obtained > total
+      ) {
+        throw new Error(
+          `${student.full_name}: ${type} marks invalid hain. Obtained marks total marks se zyada nahi ho sakte.`
+        );
+      }
+
+      student.marks[type] = { total, obtained };
+    }
+  }
+}
+
+async function saveMarks() {
+  $('saveBtn').disabled = true;
+
+  try {
+    readInputs();
+
+    const markRecords = [];
+    const resultRecords = [];
+
+    for (const student of students) {
+      for (const type of ['Assignment', 'Midterm', 'Final']) {
+        const item = student.marks[type];
+
+        markRecords.push({
+          enrollment_id: student.enrollment_id,
+          assessment_type: type,
+          total_marks: item.total,
+          obtained_marks: item.obtained
+        });
+      }
+
+      const result = calculate(student);
+
+      resultRecords.push({
+        enrollment_id: student.enrollment_id,
+        total_marks: result.total,
+        obtained_marks: result.obtained,
+        percentage: Number(result.percentage.toFixed(2)),
+        grade: result.grade,
+        status: result.status,
+        updated_at: new Date().toISOString()
+      });
+    }
+
+    const { error: marksError } = await supabase
+      .from('assessment_marks')
+      .upsert(markRecords, {
+        onConflict: 'enrollment_id,assessment_type'
+      });
+
+    if (marksError) throw marksError;
+
+    const { error: resultsError } = await supabase
+      .from('student_course_results')
+      .upsert(resultRecords, {
+        onConflict: 'enrollment_id'
+      });
+
+    if (resultsError) {
+      throw new Error(
+        'Marks save ho gaye, lekin results save nahi hue: ' +
+        resultsError.message
+      );
+    }
+
+    showMessage('Marks aur results successfully save ho gaye.');
+
+    await loadStudents();
+
+  } catch (error) {
+    showMessage(error.message, 'danger');
+  } finally {
+    $('saveBtn').disabled = students.length === 0;
+  }
+}
+
+$('loadBtn').addEventListener('click', loadStudents);
+$('saveBtn').addEventListener('click', saveMarks);
+$('searchInput').addEventListener('input', renderStudents);
+
+$('marksTable').addEventListener('change', event => {
+  if (
+    event.target.classList.contains('obtained') ||
+    event.target.classList.contains('maximum')
+  ) {
+    try {
+      readInputs();
+      renderStudents();
+    } catch (error) {
+      showMessage(error.message, 'warning');
+    }
+  }
+});
+
+try {
+  await initialize();
+} catch (error) {
+  showMessage('Page loading error: ' + error.message, 'danger');
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,573 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>Attendance Management | SE Management</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <style>
+    body {
+      background: #f4f6fa;
+    }
+
+    .header {
+      background: #12345a;
+      color: white;
+      padding: 22px;
+    }
+
+    .card {
+      border: 0;
+      border-radius: 12px;
+      box-shadow: 0 3px 15px #0000000b;
+    }
+
+    .table th {
+      background: #eaf0f7;
+      white-space: nowrap;
+    }
+
+    .form-label {
+      font-weight: 600;
+    }
+
+    .status-select {
+      min-width: 125px;
+    }
+  </style>
+</head>
+
+<body>
+
+<header class="header">
+  <div class="container-fluid d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div>
+      <h2 class="mb-1">Attendance Management</h2>
+      <div>Software Engineering Department</div>
+    </div>
+
+    <a href="dashboard.html" class="btn btn-light">
+      Back to Dashboard
+    </a>
+  </div>
+</header>
+
+<main class="container-fluid p-4">
+
+  <div id="message" aria-live="polite"></div>
+
+  <!-- Attendance Selection -->
+  <div class="card p-4 mb-4">
+
+    <h4 class="mb-3">Mark Student Attendance</h4>
+
+    <div class="row g-3">
+
+      <div class="col-md-6">
+        <label class="form-label">Select Course *</label>
+        <select id="courseSelect" class="form-select" required>
+          <option value="">Loading courses...</option>
+        </select>
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">Attendance Date *</label>
+        <input type="date" id="attendanceDate"
+               class="form-control" required>
+      </div>
+
+      <div class="col-md-2 d-flex align-items-end">
+        <button type="button" id="loadBtn"
+                class="btn btn-primary w-100">
+          Load Students
+        </button>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- Attendance List -->
+  <div class="card p-4">
+
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+
+      <div>
+        <h4 class="mb-1">Students Attendance</h4>
+        <small class="text-muted" id="attendanceInfo">
+          Select a course and date to load students.
+        </small>
+      </div>
+
+      <input
+        id="searchInput"
+        class="form-control"
+        style="max-width:250px"
+        placeholder="Search student..."
+      >
+
+    </div>
+
+    <div class="table-responsive">
+
+      <table class="table table-hover align-middle">
+
+        <thead>
+          <tr>
+            <th>Roll No</th>
+            <th>Student Name</th>
+            <th>Attendance Status</th>
+            <th>Remarks</th>
+          </tr>
+        </thead>
+
+        <tbody id="attendanceTable">
+          <tr>
+            <td colspan="4" class="text-center">
+              Select a course and date first.
+            </td>
+          </tr>
+        </tbody>
+
+      </table>
+
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3">
+
+      <small class="text-muted" id="studentCount">
+        Total Students: 0
+      </small>
+
+      <button type="button" id="saveBtn"
+              class="btn btn-success" disabled>
+        Save Attendance
+      </button>
+
+    </div>
+
+  </div>
+
+</main>
+
+<script type="module">
+
+import { supabase } from './js/supabase.js';
+
+const $ = id => document.getElementById(id);
+
+let courses = [];
+let studentsAttendance = [];
+
+// Today's date in local timezone
+function getLocalDate() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
+
+// Escape HTML
+function escapeHTML(value) {
+  return String(value ?? '').replace(/[&<>"']/g, char => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  })[char]);
+}
+
+// Show message
+function showMessage(message, type = 'success') {
+  $('message').innerHTML = `
+    <div class="alert alert-${type} alert-dismissible fade show">
+      ${escapeHTML(message)}
+      <button type="button" class="btn-close"
+              data-bs-dismiss="alert"></button>
+    </div>
+  `;
+}
+
+// Initialize
+async function initialize() {
+
+  const { data: { user }, error: authError } =
+    await supabase.auth.getUser();
+
+  if (authError || !user) {
+    window.location.href = 'login.html';
+    return;
+  }
+
+  $('attendanceDate').value = getLocalDate();
+
+  await loadCourses();
+
+}
+
+// Load courses
+async function loadCourses() {
+
+  const { data, error } = await supabase
+    .from('courses')
+    .select('course_id, semester_id, course_code, course_name')
+    .order('course_code');
+
+  if (error) throw error;
+
+  courses = data || [];
+
+  if (!courses.length) {
+    $('courseSelect').innerHTML =
+      '<option value="">No courses available</option>';
+    return;
+  }
+
+  const semesterIds = [
+    ...new Set(courses.map(c => c.semester_id))
+  ];
+
+  const { data: semesterData, error: semesterError } =
+    await supabase
+      .from('semesters')
+      .select('semester_id, semester_number, semester_name')
+      .in('semester_id', semesterIds);
+
+  if (semesterError) throw semesterError;
+
+  const semesters = semesterData || [];
+
+  $('courseSelect').innerHTML =
+    '<option value="">Select Course</option>' +
+    courses.map(c => {
+
+      const semester = semesters.find(
+        s => String(s.semester_id) === String(c.semester_id)
+      );
+
+      const semesterName = semester?.semester_name ||
+        'Semester ' + (semester?.semester_number || '');
+
+      return `
+        <option value="${c.course_id}">
+          ${escapeHTML(c.course_code)} -
+          ${escapeHTML(c.course_name)}
+          (${escapeHTML(semesterName)})
+        </option>
+      `;
+
+    }).join('');
+
+}
+
+// Load enrolled students and existing attendance
+async function loadAttendance() {
+
+  const courseId = $('courseSelect').value;
+  const date = $('attendanceDate').value;
+
+  if (!courseId || !date) {
+    showMessage('Please select a course and attendance date.', 'warning');
+    return;
+  }
+
+  $('loadBtn').disabled = true;
+  $('attendanceTable').innerHTML = `
+    <tr>
+      <td colspan="4" class="text-center">Loading students...</td>
+    </tr>
+  `;
+
+  try {
+
+    // Find enrollments for selected course
+    const { data: enrollmentData, error: enrollmentError } =
+      await supabase
+        .from('enrollments')
+        .select('enrollment_id, history_id, course_id, status')
+        .eq('course_id', courseId);
+
+    if (enrollmentError) throw enrollmentError;
+
+    const enrollments = enrollmentData || [];
+
+    if (!enrollments.length) {
+
+      studentsAttendance = [];
+      renderAttendance();
+
+      $('attendanceInfo').textContent =
+        'No students are enrolled in this course.';
+
+      return;
+    }
+
+    // Find student semester history
+    const historyIds = [
+      ...new Set(enrollments.map(e => e.history_id))
+    ];
+
+    const { data: historyData, error: historyError } =
+      await supabase
+        .from('student_semester_history')
+        .select('history_id, student_id')
+        .in('history_id', historyIds);
+
+    if (historyError) throw historyError;
+
+    const histories = historyData || [];
+
+    const studentIds = [
+      ...new Set(histories.map(h => h.student_id))
+    ];
+
+    if (!studentIds.length) {
+      studentsAttendance = [];
+      renderAttendance();
+      return;
+    }
+
+    // Load student details
+    const { data: studentData, error: studentError } =
+      await supabase
+        .from('students')
+        .select('student_id, roll_no, full_name')
+        .in('student_id', studentIds)
+        .order('roll_no');
+
+    if (studentError) throw studentError;
+
+    const studentList = studentData || [];
+
+    // Load attendance already saved for this date
+    const enrollmentIds = enrollments.map(e => e.enrollment_id);
+
+    const { data: attendanceData, error: attendanceError } =
+      await supabase
+        .from('attendance')
+        .select('enrollment_id, attendance_date, status, remarks')
+        .eq('attendance_date', date)
+        .in('enrollment_id', enrollmentIds);
+
+    if (attendanceError) throw attendanceError;
+
+    const savedAttendance = attendanceData || [];
+
+    // Combine student, enrollment and attendance data
+    studentsAttendance = enrollments.map(enrollment => {
+
+      const history = histories.find(
+        h => h.history_id === enrollment.history_id
+      );
+
+      const student = studentList.find(
+        s => s.student_id === history?.student_id
+      );
+
+      const saved = savedAttendance.find(
+        a => a.enrollment_id === enrollment.enrollment_id
+      );
+
+      return {
+        enrollment_id: enrollment.enrollment_id,
+        student_id: student?.student_id,
+        roll_no: student?.roll_no || '',
+        full_name: student?.full_name || 'Unknown Student',
+        status: saved?.status || '',
+        remarks: saved?.remarks || ''
+      };
+
+    }).filter(s => s.student_id);
+
+    renderAttendance();
+
+    $('attendanceInfo').textContent =
+      `Attendance Date: ${date}`;
+
+  } catch (error) {
+
+    studentsAttendance = [];
+    renderAttendance();
+
+    showMessage('Error loading students: ' + error.message, 'danger');
+
+  } finally {
+
+    $('loadBtn').disabled = false;
+
+  }
+
+}
+
+// Render attendance table
+function renderAttendance() {
+
+  const search = $('searchInput').value.toLowerCase();
+
+  const filtered = studentsAttendance.filter(s =>
+    [s.roll_no, s.full_name].some(value =>
+      String(value || '').toLowerCase().includes(search)
+    )
+  );
+
+  $('studentCount').textContent =
+    `Total Students: ${studentsAttendance.length}`;
+
+  $('saveBtn').disabled = studentsAttendance.length === 0;
+
+  if (!filtered.length) {
+
+    $('attendanceTable').innerHTML = `
+      <tr>
+        <td colspan="4" class="text-center">
+          No students found.
+        </td>
+      </tr>
+    `;
+
+    return;
+  }
+
+  $('attendanceTable').innerHTML = filtered.map(s => `
+
+    <tr data-enrollment="${escapeHTML(s.enrollment_id)}">
+
+      <td>${escapeHTML(s.roll_no)}</td>
+
+      <td>${escapeHTML(s.full_name)}</td>
+
+      <td>
+        <select class="form-select status-select attendance-status">
+          <option value="">Select Status</option>
+          <option value="Present" ${s.status === 'Present' ? 'selected' : ''}>
+            Present
+          </option>
+          <option value="Absent" ${s.status === 'Absent' ? 'selected' : ''}>
+            Absent
+          </option>
+          <option value="Late" ${s.status === 'Late' ? 'selected' : ''}>
+            Late
+          </option>
+          <option value="Leave" ${s.status === 'Leave' ? 'selected' : ''}>
+            Leave
+          </option>
+        </select>
+      </td>
+
+      <td>
+        <input
+          class="form-control attendance-remarks"
+          value="${escapeHTML(s.remarks)}"
+          placeholder="Optional remarks"
+        >
+      </td>
+
+    </tr>
+
+  `).join('');
+
+}
+
+// Save attendance
+async function saveAttendance() {
+
+  const date = $('attendanceDate').value;
+
+  if (!date || !studentsAttendance.length) {
+    showMessage('Please load students first.', 'warning');
+    return;
+  }
+
+  const rows = [
+    ...$('attendanceTable').querySelectorAll('tr[data-enrollment]')
+  ];
+
+  // Read values from all visible and filtered rows.
+  rows.forEach(row => {
+
+    const student = studentsAttendance.find(
+      s => String(s.enrollment_id) === row.dataset.enrollment
+    );
+
+    if (student) {
+      student.status = row.querySelector('.attendance-status').value;
+      student.remarks = row.querySelector('.attendance-remarks').value.trim();
+    }
+
+  });
+
+  // Validate every student, including currently filtered students.
+  const missing = studentsAttendance.filter(s => !s.status);
+
+  if (missing.length) {
+    showMessage(
+      'Please select attendance status for every student before saving.',
+      'warning'
+    );
+    return;
+  }
+
+  const records = studentsAttendance.map(s => ({
+    enrollment_id: s.enrollment_id,
+    attendance_date: date,
+    status: s.status,
+    remarks: s.remarks || null
+  }));
+
+  $('saveBtn').disabled = true;
+
+  try {
+
+    const { error } = await supabase
+      .from('attendance')
+      .upsert(records, {
+        onConflict: 'enrollment_id,attendance_date'
+      });
+
+    if (error) throw error;
+
+    showMessage('Attendance saved successfully.');
+
+    await loadAttendance();
+
+  } catch (error) {
+
+    showMessage('Error saving attendance: ' + error.message, 'danger');
+
+  } finally {
+
+    $('saveBtn').disabled = false;
+
+  }
+
+}
+
+// Events
+$('loadBtn').addEventListener('click', loadAttendance);
+
+$('saveBtn').addEventListener('click', saveAttendance);
+
+$('searchInput').addEventListener('input', renderAttendance);
+
+// Start page
+try {
+
+  await initialize();
+
+} catch (error) {
+
+  showMessage('Page loading error: ' + error.message, 'danger');
+
+}
+
+</script>
+
+</body>
+</html>

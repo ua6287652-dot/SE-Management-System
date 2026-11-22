@@ -1,0 +1,654 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Admin Login | SE Department Management System</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      height: 100vh;
+      padding: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #f0f4fa;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      overflow: hidden;
+    }
+
+    /* MAIN TWO-BLOCK CONTAINER */
+    .login-wrapper {
+      width: 100%;
+      max-width: 1100px;
+      height: calc(100vh - 24px);
+      max-height: 760px;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      background: #ffffff;
+      border-radius: 22px;
+      overflow: hidden;
+      box-shadow: 0 18px 55px rgba(20, 42, 75, 0.13);
+    }
+
+    /* LEFT BRANDING PANEL */
+    .brand-panel {
+      background: linear-gradient(145deg, #101d40, #173e78, #1768a6);
+      color: white;
+      padding: 35px 42px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .brand-panel::before,
+    .brand-panel::after {
+      content: "";
+      position: absolute;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
+    .brand-panel::before {
+      width: 350px;
+      height: 350px;
+      right: -130px;
+      top: -100px;
+    }
+
+    .brand-panel::after {
+      width: 250px;
+      height: 250px;
+      left: -100px;
+      bottom: -100px;
+    }
+
+    .brand-content {
+      position: relative;
+      z-index: 1;
+    }
+
+    /* SE LOGO */
+    .brand-logo {
+      width: 105px;
+      height: 105px;
+      border-radius: 18px;
+      background: #ffffff;
+      color: #1768b2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 24px;
+      box-shadow: 0 5px 18px rgba(0,0,0,0.15);
+    }
+
+    .brand-logo span {
+      font-size: 36px;
+      font-weight: 900;
+      line-height: 1;
+      letter-spacing: 2px;
+    }
+
+    .brand-logo small {
+      font-size: 8px;
+      font-weight: 800;
+      letter-spacing: 0.8px;
+      line-height: 1.3;
+      text-align: center;
+      margin-top: 6px;
+    }
+
+    .brand-small {
+      color: #a9d9ff;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-bottom: 15px;
+    }
+
+    .brand-title {
+      font-size: clamp(30px, 3.5vw, 40px);
+      font-weight: 800;
+      line-height: 1.2;
+      margin-bottom: 15px;
+    }
+
+    .brand-title span {
+      color: #69c5ff;
+    }
+
+    .brand-description {
+      color: #d5e5f7;
+      line-height: 1.7;
+      font-size: 14px;
+      max-width: 420px;
+    }
+
+    .brand-features {
+      list-style: none;
+      padding: 0;
+      margin-top: 22px;
+      margin-bottom: 0;
+    }
+
+    .brand-features li {
+      margin-bottom: 12px;
+      color: #eef6ff;
+      font-size: 13px;
+    }
+
+    .brand-features i {
+      color: #67e0c0;
+      margin-right: 12px;
+      font-size: 17px;
+    }
+
+    .brand-footer {
+      margin-top: 25px;
+      color: #b8d1ed;
+      font-size: 12px;
+    }
+
+    /* RIGHT LOGIN PANEL */
+    .login-panel {
+      padding: 30px 45px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #ffffff;
+      min-width: 0;
+    }
+
+    .login-box {
+      width: 100%;
+      max-width: 420px;
+    }
+
+    .login-heading {
+      margin-bottom: 25px;
+    }
+
+    .login-heading h2 {
+      color: #142544;
+      font-size: 31px;
+      font-weight: 800;
+      margin-bottom: 10px;
+    }
+
+    .login-heading p {
+      color: #7b879a;
+      font-size: 14px;
+      line-height: 1.7;
+      margin-bottom: 0;
+    }
+
+    .form-label {
+      color: #253652;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 9px;
+    }
+
+    .form-control {
+      min-height: 47px;
+      border: 1px solid #dce3ee;
+      border-radius: 9px;
+      padding: 11px 14px;
+      font-size: 14px;
+      box-shadow: none !important;
+    }
+
+    .form-control:focus {
+      border-color: #2877d5;
+    }
+
+    .input-group .form-control {
+      border-radius: 9px 0 0 9px;
+    }
+
+    .input-group .btn {
+      border: 1px solid #dce3ee;
+      border-left: 0;
+      border-radius: 0 9px 9px 0;
+      color: #718096;
+      background: white;
+    }
+
+    .forgot-link {
+      color: #1768b2;
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    .forgot-link:hover {
+      text-decoration: underline;
+    }
+
+    .login-btn {
+      width: 100%;
+      min-height: 49px;
+      border: none;
+      border-radius: 9px;
+      color: white;
+      font-weight: 700;
+      font-size: 15px;
+      background: linear-gradient(100deg, #1768b2, #2454a5);
+      transition: 0.2s ease;
+    }
+
+    .login-btn:hover {
+      color: white;
+      background: linear-gradient(100deg, #12528f, #1c438b);
+      transform: translateY(-1px);
+    }
+
+    .login-note {
+      color: #8290a0;
+      font-size: 12px;
+      text-align: center;
+      margin-top: 22px;
+      line-height: 1.7;
+      margin-bottom: 0;
+    }
+
+    #loginMessage {
+      font-size: 13px;
+      margin-bottom: 12px;
+    }
+
+    /* SHORT LAPTOP SCREENS */
+    @media (min-width: 801px) and (max-height: 800px) {
+      .brand-panel {
+        padding: 18px 35px;
+      }
+
+      .login-panel {
+        padding: 18px 35px;
+      }
+
+      .brand-logo {
+        width: 90px;
+        height: 90px;
+        margin-bottom: 16px;
+      }
+
+      .brand-logo span {
+        font-size: 32px;
+      }
+
+      .brand-title {
+        font-size: 32px;
+        margin-bottom: 12px;
+      }
+
+      .brand-description {
+        font-size: 13px;
+        line-height: 1.6;
+      }
+
+      .brand-features {
+        margin-top: 18px;
+      }
+
+      .brand-features li {
+        margin-bottom: 9px;
+      }
+
+      .brand-footer {
+        margin-top: 16px;
+      }
+
+      .login-heading {
+        margin-bottom: 17px;
+      }
+
+      .login-heading h2 {
+        font-size: 27px;
+        margin-bottom: 7px;
+      }
+
+      .login-heading p {
+        font-size: 13px;
+      }
+
+      .login-panel .mb-3 {
+        margin-bottom: 10px !important;
+      }
+
+      .login-panel .mb-4 {
+        margin-bottom: 15px !important;
+      }
+
+      .form-control {
+        min-height: 43px;
+      }
+
+      .login-btn {
+        min-height: 45px;
+      }
+
+      .login-note {
+        margin-top: 15px;
+      }
+    }
+
+    /* VERY SHORT LAPTOP SCREENS */
+    @media (min-width: 801px) and (max-height: 650px) {
+      .brand-panel,
+      .login-panel {
+        padding: 12px 28px;
+      }
+
+      .brand-logo {
+        width: 75px;
+        height: 75px;
+        margin-bottom: 10px;
+      }
+
+      .brand-logo span {
+        font-size: 27px;
+      }
+
+      .brand-title {
+        font-size: 28px;
+        margin: 8px 0;
+      }
+
+      .brand-description {
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .brand-features {
+        margin-top: 12px;
+      }
+
+      .brand-features li {
+        margin-bottom: 7px;
+        font-size: 11px;
+      }
+
+      .brand-footer {
+        margin-top: 10px;
+        font-size: 10px;
+      }
+
+      .login-heading {
+        margin-bottom: 12px;
+      }
+
+      .login-heading h2 {
+        font-size: 25px;
+      }
+
+      .login-panel .mb-3,
+      .login-panel .mb-4 {
+        margin-bottom: 9px !important;
+      }
+
+      .form-control {
+        min-height: 39px;
+      }
+
+      .login-btn {
+        min-height: 42px;
+      }
+
+      .login-note {
+        margin-top: 10px;
+        font-size: 11px;
+      }
+    }
+
+    /* TABLET AND MOBILE */
+    @media (max-width: 800px) {
+      body {
+        height: auto;
+        min-height: 100vh;
+        padding: 15px;
+        overflow-y: auto;
+      }
+
+      .login-wrapper {
+        height: auto;
+        max-height: none;
+        min-height: auto;
+        grid-template-columns: 1fr;
+        max-width: 520px;
+        margin: auto;
+      }
+
+      .brand-panel {
+        padding: 30px 28px;
+      }
+
+      .brand-logo {
+        width: 90px;
+        height: 90px;
+      }
+
+      .brand-title {
+        font-size: 29px;
+      }
+
+      .brand-features {
+        margin-top: 18px;
+      }
+
+      .brand-footer {
+        margin-top: 18px;
+      }
+
+      .login-panel {
+        padding: 35px 28px;
+      }
+    }
+
+    @media (max-width: 400px) {
+      body {
+        padding: 10px;
+      }
+
+      .brand-panel {
+        padding: 25px 22px;
+      }
+
+      .login-panel {
+        padding: 30px 20px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <main class="login-wrapper">
+
+    <!-- LEFT SIDE: PROJECT BRANDING -->
+    <section class="brand-panel">
+
+      <div class="brand-content">
+
+        <div class="brand-logo">
+          <span>SE</span>
+          <small>SOFTWARE<br>ENGINEERING</small>
+        </div>
+
+        <div class="brand-small">Administrator Portal</div>
+
+        <h1 class="brand-title">
+          SE Department<br>
+          <span>Management System</span>
+        </h1>
+
+        <p class="brand-description">
+          A centralized digital platform designed to manage
+          students, teachers, courses, attendance, academic
+          results and departmental records efficiently.
+        </p>
+
+        <ul class="brand-features">
+
+          <li>
+            <i class="bi bi-check-circle-fill"></i>
+            Smart Student Management
+          </li>
+
+          <li>
+            <i class="bi bi-check-circle-fill"></i>
+            Attendance & Academic Tracking
+          </li>
+
+          <li>
+            <i class="bi bi-check-circle-fill"></i>
+            Results & Performance Monitoring
+          </li>
+
+          <li>
+            <i class="bi bi-check-circle-fill"></i>
+            Complete Department Administration
+          </li>
+
+        </ul>
+
+        <div class="brand-footer">
+          © 2026 Software Engineering Department
+        </div>
+
+      </div>
+    </section>
+
+    <!-- RIGHT SIDE: ADMIN LOGIN FORM -->
+    <section class="login-panel">
+
+      <div class="login-box">
+
+        <div class="login-heading">
+          <h2>Welcome Back!</h2>
+          <p>Sign in to access your administration dashboard.</p>
+        </div>
+
+        <div id="loginMessage" aria-live="polite"></div>
+
+        <form id="loginForm">
+
+          <div class="mb-3">
+
+            <label for="email" class="form-label">
+              Email Address
+            </label>
+
+            <input
+              type="email"
+              id="email"
+              class="form-control"
+              placeholder="Enter your admin email"
+              autocomplete="username"
+              required
+            >
+
+          </div>
+
+          <div class="mb-3">
+
+            <label for="password" class="form-label">
+              Password
+            </label>
+
+            <div class="input-group">
+
+              <input
+                type="password"
+                id="password"
+                class="form-control"
+                placeholder="Enter your password"
+                autocomplete="current-password"
+                required
+              >
+
+              <button
+                class="btn"
+                type="button"
+                id="togglePassword"
+                aria-label="Show password"
+              >
+                <i class="bi bi-eye" id="eyeIcon"></i>
+              </button>
+
+            </div>
+
+          </div>
+
+          <div class="d-flex justify-content-end mb-4">
+            <a href="forgot-password.html" class="forgot-link">
+              Forgot Password?
+            </a>
+          </div>
+
+          <button type="submit" id="loginBtn" class="login-btn">
+            <i class="bi bi-box-arrow-in-right me-2"></i>
+            Sign In to Dashboard
+          </button>
+
+        </form>
+
+        <p class="login-note">
+          <i class="bi bi-shield-lock-fill me-1"></i>
+          Secure administrator access.
+          Authorized users only.
+        </p>
+
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- SHOW / HIDE PASSWORD -->
+  <script>
+    const passwordInput = document.getElementById('password');
+    const togglePassword = document.getElementById('togglePassword');
+    const eyeIcon = document.getElementById('eyeIcon');
+
+    togglePassword.addEventListener('click', () => {
+
+      const isPassword = passwordInput.type === 'password';
+
+      passwordInput.type = isPassword ? 'text' : 'password';
+
+      eyeIcon.className = isPassword
+        ? 'bi bi-eye-slash'
+        : 'bi bi-eye';
+
+      togglePassword.setAttribute(
+        'aria-label',
+        isPassword ? 'Hide password' : 'Show password'
+      );
+
+    });
+  </script>
+
+  <!-- EXISTING ADMIN SUPABASE AUTHENTICATION -->
+  <script type="module" src="js/auth.js"></script>
+
+</body>
+</html>

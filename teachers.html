@@ -1,0 +1,649 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Teacher Management | SE Management</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <style>
+    body { background: #f4f6fa; }
+    .header { background: #12345a; color: white; padding: 22px; }
+    .card { border: 0; border-radius: 12px; box-shadow: 0 3px 15px #0000000b; }
+    .table th { background: #eaf0f7; white-space: nowrap; }
+    .form-label { font-weight: 600; }
+    .subject-row {
+      background: #f8faff;
+      border: 1px solid #e1e8f0;
+      border-radius: 10px;
+      padding: 15px;
+    }
+  </style>
+</head>
+
+<body>
+
+<header class="header">
+  <div class="container-fluid d-flex justify-content-between align-items-center">
+    <div>
+      <h2 class="mb-1">Teacher Management</h2>
+      <div>Software Engineering Department</div>
+    </div>
+    <a href="dashboard.html" class="btn btn-light">Back to Dashboard</a>
+  </div>
+</header>
+
+<main class="container-fluid p-4">
+
+  <div id="message"></div>
+
+  <!-- Teacher Form -->
+  <div class="card p-4 mb-4">
+
+    <h4 id="formHeading">Add New Teacher</h4>
+
+    <form id="teacherForm">
+      <input type="hidden" id="teacherId">
+
+      <h5 class="mt-3 mb-3">Teacher Information</h5>
+
+      <div class="row g-3">
+
+        <div class="col-md-6">
+          <label class="form-label">Full Name *</label>
+          <input id="full_name" class="form-control" required>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label">Email</label>
+          <input id="email" type="email" class="form-control">
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label">Phone</label>
+          <input id="phone" class="form-control">
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label">Designation</label>
+          <input id="designation" class="form-control"
+                 placeholder="e.g. Lecturer, Assistant Professor">
+        </div>
+
+        <div class="col-md-12">
+          <label class="form-label">Department *</label>
+          <select id="department_id" class="form-select" required>
+            <option value="">Loading departments...</option>
+          </select>
+        </div>
+
+      </div>
+
+      <!-- Subjects Section -->
+      <hr class="my-4">
+
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+          <h5 class="mb-1">Teacher Subjects</h5>
+          <p class="text-muted mb-0">
+            Add one or more subjects taught by this teacher.
+          </p>
+        </div>
+
+        <button type="button" class="btn btn-outline-primary"
+                id="addSubjectBtn">
+          + Add Another Subject
+        </button>
+      </div>
+
+      <div id="subjectsContainer" class="mt-3"></div>
+
+      <div class="mt-4">
+        <button type="submit" class="btn btn-primary" id="saveBtn">
+          Save Teacher
+        </button>
+
+        <button type="button" class="btn btn-secondary"
+                id="cancelBtn" hidden>
+          Cancel Edit
+        </button>
+      </div>
+
+    </form>
+  </div>
+
+  <!-- Teachers List -->
+  <div class="card p-4">
+
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+      <h4 class="mb-0">Teachers List</h4>
+
+      <input id="searchInput" class="form-control"
+             style="max-width:300px"
+             placeholder="Search teacher or subject...">
+    </div>
+
+    <div class="table-responsive">
+
+      <table class="table table-hover align-middle">
+
+        <thead>
+          <tr>
+            <th>Teacher Name</th>
+            <th>Email</th>
+            <th>Phone</th>
+            <th>Designation</th>
+            <th>Department</th>
+            <th>Assigned Subjects</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+
+        <tbody id="teachersTable">
+          <tr>
+            <td colspan="7" class="text-center">Loading teachers...</td>
+          </tr>
+        </tbody>
+
+      </table>
+
+    </div>
+  </div>
+
+</main>
+
+<script type="module">
+
+import { supabase } from './js/supabase.js';
+
+const $ = id => document.getElementById(id);
+
+let teachers = [];
+let departments = [];
+let semesters = [];
+let courses = [];
+
+function escapeHTML(value) {
+  return String(value ?? '').replace(/[&<>"']/g, char => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  })[char]);
+}
+
+function showMessage(message, type = 'success') {
+  $('message').innerHTML = `
+    <div class="alert alert-${type} alert-dismissible fade show">
+      ${escapeHTML(message)}
+      <button type="button" class="btn-close"
+              data-bs-dismiss="alert"></button>
+    </div>`;
+}
+
+async function initialize() {
+
+  const { data: { user }, error: authError } =
+    await supabase.auth.getUser();
+
+  if (authError || !user) {
+    window.location.href = 'login.html';
+    return;
+  }
+
+  await loadDepartments();
+  await loadSemesters();
+  addSubjectRow();
+  await loadTeachers();
+}
+
+// Load departments
+async function loadDepartments() {
+
+  const { data, error } = await supabase
+    .from('departments')
+    .select('department_id, department_name, department_code')
+    .order('department_name');
+
+  if (error) throw error;
+
+  departments = data || [];
+
+  $('department_id').innerHTML =
+    '<option value="">Select Department</option>' +
+    departments.map(d => `
+      <option value="${d.department_id}">
+        ${escapeHTML(d.department_name)}
+        (${escapeHTML(d.department_code)})
+      </option>
+    `).join('');
+}
+
+// Load semesters
+async function loadSemesters() {
+
+  const { data, error } = await supabase
+    .from('semesters')
+    .select('semester_id, semester_number, semester_name')
+    .order('semester_number');
+
+  if (error) throw error;
+
+  semesters = data || [];
+}
+
+// Add a subject form row
+function addSubjectRow() {
+
+  const row = document.createElement('div');
+  row.className = 'subject-row mb-3';
+
+  row.innerHTML = `
+    <div class="row g-3 align-items-end">
+
+      <div class="col-md-3">
+        <label class="form-label">Semester *</label>
+        <select class="form-select subject-semester" required>
+          <option value="">Select Semester</option>
+          ${semesters.map(s => `
+            <option value="${s.semester_id}">
+              ${escapeHTML(s.semester_name || 'Semester ' + s.semester_number)}
+            </option>
+          `).join('')}
+        </select>
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">Course Code *</label>
+        <input class="form-control subject-code"
+               placeholder="e.g. SE-101" required>
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">Subject Name *</label>
+        <input class="form-control subject-name"
+               placeholder="e.g. Programming Fundamentals" required>
+      </div>
+
+      <div class="col-md-2">
+        <label class="form-label">Credit Hours *</label>
+        <input type="number" class="form-control subject-credits"
+               min="1" max="6" value="3" required>
+      </div>
+
+      <div class="col-md-1">
+        <button type="button"
+                class="btn btn-outline-danger remove-subject w-100">
+          X
+        </button>
+      </div>
+
+    </div>
+  `;
+
+  $('subjectsContainer').appendChild(row);
+}
+
+// Read subject form rows
+function getSubjectPayload() {
+
+  const rows = [
+    ...$('subjectsContainer').querySelectorAll('.subject-row')
+  ];
+
+  return rows.map(row => ({
+    semester_id: row.querySelector('.subject-semester').value,
+    course_code: row.querySelector('.subject-code').value.trim(),
+    course_name: row.querySelector('.subject-name').value.trim(),
+    credit_hours: Number(
+      row.querySelector('.subject-credits').value
+    )
+  }));
+}
+
+// Load teachers and their subjects
+async function loadTeachers() {
+
+  $('teachersTable').innerHTML =
+    '<tr><td colspan="7" class="text-center">Loading...</td></tr>';
+
+  const { data, error } = await supabase
+    .from('teachers')
+    .select('teacher_id, department_id, full_name, email, phone, designation')
+    .order('full_name');
+
+  if (error) throw error;
+
+  teachers = data || [];
+
+  const { data: courseData, error: courseError } = await supabase
+    .from('courses')
+    .select('course_id, teacher_id, course_code, course_name, credit_hours, semester_id')
+    .order('course_name');
+
+  if (courseError) throw courseError;
+
+  courses = courseData || [];
+
+  renderTeachers();
+}
+
+// Display teachers
+function renderTeachers() {
+
+  const search = $('searchInput').value.toLowerCase();
+
+  const filtered = teachers.filter(t => {
+
+    const teacherCourses = courses.filter(
+      c => c.teacher_id === t.teacher_id
+    );
+
+    const subjectText = teacherCourses
+      .map(c => `${c.course_code} ${c.course_name}`)
+      .join(' ');
+
+    return [
+      t.full_name,
+      t.email,
+      t.phone,
+      t.designation,
+      subjectText
+    ].some(value =>
+      (value || '').toLowerCase().includes(search)
+    );
+  });
+
+  if (!filtered.length) {
+    $('teachersTable').innerHTML = `
+      <tr>
+        <td colspan="7" class="text-center">No teachers found.</td>
+      </tr>`;
+    return;
+  }
+
+  $('teachersTable').innerHTML = filtered.map(t => {
+
+    const department = departments.find(
+      d => d.department_id === t.department_id
+    );
+
+    const teacherCourses = courses.filter(
+      c => c.teacher_id === t.teacher_id
+    );
+
+    const subjectHTML = teacherCourses.length
+      ? teacherCourses.map(c => {
+          const semester = semesters.find(
+            s => s.semester_id === c.semester_id
+          );
+
+         return `
+  <div class="mb-2">
+    <span class="badge bg-primary">
+      ${escapeHTML(c.course_code)}
+    </span>
+
+    <strong>${escapeHTML(c.course_name)}</strong>
+
+    <small class="text-muted">
+      (${escapeHTML(
+        semester?.semester_name ||
+        'Semester ' + (semester?.semester_number || '')
+      )})
+    </small>
+
+    <span class="badge bg-success">
+      ${escapeHTML(c.credit_hours)} Credit Hours
+    </span>
+  </div>
+`;
+        }).join('')
+      : '<span class="text-muted">No subjects assigned</span>';
+
+    return `
+      <tr>
+        <td>${escapeHTML(t.full_name)}</td>
+        <td>${escapeHTML(t.email || '-')}</td>
+        <td>${escapeHTML(t.phone || '-')}</td>
+        <td>${escapeHTML(t.designation || '-')}</td>
+        <td>${escapeHTML(department?.department_name || '-')}</td>
+        <td>${subjectHTML}</td>
+        <td>
+          <button class="btn btn-sm btn-warning me-1"
+                  data-edit="${t.teacher_id}">
+            Edit
+          </button>
+
+          <button class="btn btn-sm btn-danger"
+                  data-delete="${t.teacher_id}">
+            Delete
+          </button>
+        </td>
+      </tr>
+    `;
+
+  }).join('');
+}
+
+// Save teacher and subjects
+$('teacherForm').addEventListener('submit', async event => {
+
+  event.preventDefault();
+
+  const id = $('teacherId').value;
+
+  const payload = {
+    full_name: $('full_name').value.trim(),
+    email: $('email').value.trim() || null,
+    phone: $('phone').value.trim() || null,
+    designation: $('designation').value.trim() || null,
+    department_id: $('department_id').value
+  };
+
+  const subjectPayload = getSubjectPayload();
+
+  if (!subjectPayload.length) {
+    showMessage('Please add at least one subject.', 'warning');
+    return;
+  }
+
+  if (subjectPayload.some(s =>
+    !s.semester_id ||
+    !s.course_code ||
+    !s.course_name ||
+    !Number.isFinite(s.credit_hours) ||
+    s.credit_hours < 1 ||
+    s.credit_hours > 6
+  )) {
+    showMessage('Please complete all subject fields correctly.', 'warning');
+    return;
+  }
+
+  $('saveBtn').disabled = true;
+
+  try {
+
+    let teacherId = id;
+
+    if (id) {
+
+      const { error } = await supabase
+        .from('teachers')
+        .update(payload)
+        .eq('teacher_id', id);
+
+      if (error) throw error;
+
+    } else {
+
+      const { data, error } = await supabase
+        .from('teachers')
+        .insert(payload)
+        .select('teacher_id')
+        .single();
+
+      if (error) throw error;
+
+      teacherId = data.teacher_id;
+    }
+
+    // Link every subject to this teacher
+    const coursesToInsert = subjectPayload.map(subject => ({
+      ...subject,
+      teacher_id: teacherId
+    }));
+
+    const { error: courseError } = await supabase
+      .from('courses')
+      .insert(coursesToInsert);
+
+    if (courseError) {
+      showMessage(
+        'Teacher save ho gaya, lekin subjects save nahi hue. Details: ' +
+        courseError.message,
+        'warning'
+      );
+    } else {
+      showMessage(
+        id
+          ? 'Teacher updated and new subjects assigned successfully.'
+          : 'Teacher and subjects added successfully.'
+      );
+    }
+
+    resetForm();
+    await loadTeachers();
+
+  } catch (error) {
+
+    showMessage('Error: ' + error.message, 'danger');
+
+  } finally {
+
+    $('saveBtn').disabled = false;
+
+  }
+
+});
+
+// Edit and delete teacher
+$('teachersTable').addEventListener('click', async event => {
+
+  const editId = event.target.dataset.edit;
+  const deleteId = event.target.dataset.delete;
+
+  if (editId) {
+
+    const teacher = teachers.find(
+      t => t.teacher_id === editId
+    );
+
+    if (!teacher) return;
+
+    $('teacherId').value = teacher.teacher_id;
+    $('full_name').value = teacher.full_name || '';
+    $('email').value = teacher.email || '';
+    $('phone').value = teacher.phone || '';
+    $('designation').value = teacher.designation || '';
+    $('department_id').value = teacher.department_id;
+
+    // Editing adds additional subjects to the teacher.
+    // Existing subjects remain saved.
+    $('subjectsContainer').innerHTML = '';
+    addSubjectRow();
+
+    $('formHeading').textContent = 'Edit Teacher';
+    $('saveBtn').textContent = 'Update Teacher';
+    $('cancelBtn').hidden = false;
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  if (deleteId) {
+
+    const teacher = teachers.find(
+      t => t.teacher_id === deleteId
+    );
+
+    if (!teacher) return;
+
+    if (!confirm(
+      `Are you sure you want to delete ${teacher.full_name}?`
+    )) return;
+
+    const { error } = await supabase
+      .from('teachers')
+      .delete()
+      .eq('teacher_id', deleteId);
+
+    if (error) {
+
+      showMessage(
+        'Teacher delete nahi hua. Mumkin hai is teacher ke courses linked hon. Details: ' +
+        error.message,
+        'danger'
+      );
+
+    } else {
+
+      showMessage('Teacher deleted successfully.');
+      await loadTeachers();
+
+    }
+  }
+
+});
+
+// Add subject button
+$('addSubjectBtn').addEventListener('click', addSubjectRow);
+
+// Remove subject row
+$('subjectsContainer').addEventListener('click', event => {
+
+  if (event.target.classList.contains('remove-subject')) {
+
+    const rows = $('subjectsContainer').querySelectorAll('.subject-row');
+
+    if (rows.length > 1) {
+      event.target.closest('.subject-row').remove();
+    } else {
+      showMessage('At least one subject row is required.', 'warning');
+    }
+  }
+
+});
+
+// Reset form
+function resetForm() {
+
+  $('teacherForm').reset();
+  $('teacherId').value = '';
+
+  $('subjectsContainer').innerHTML = '';
+  addSubjectRow();
+
+  $('formHeading').textContent = 'Add New Teacher';
+  $('saveBtn').textContent = 'Save Teacher';
+  $('cancelBtn').hidden = true;
+}
+
+$('cancelBtn').addEventListener('click', resetForm);
+$('searchInput').addEventListener('input', renderTeachers);
+
+// Start page
+try {
+  await initialize();
+} catch (error) {
+  showMessage('Page loading error: ' + error.message, 'danger');
+}
+
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+</body>
+</html>

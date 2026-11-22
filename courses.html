@@ -1,0 +1,588 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>Course Management | SE Management</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <style>
+    body {
+      background: #f4f6fa;
+    }
+
+    .header {
+      background: #12345a;
+      color: white;
+      padding: 22px;
+    }
+
+    .card {
+      border: 0;
+      border-radius: 12px;
+      box-shadow: 0 3px 15px #0000000b;
+    }
+
+    .table th {
+      background: #eaf0f7;
+      white-space: nowrap;
+    }
+
+    .form-label {
+      font-weight: 600;
+    }
+  </style>
+</head>
+
+<body>
+
+<header class="header">
+  <div class="container-fluid d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div>
+      <h2 class="mb-1">Course Management</h2>
+      <div>Software Engineering Department</div>
+    </div>
+
+    <a href="dashboard.html" class="btn btn-light">
+      Back to Dashboard
+    </a>
+  </div>
+</header>
+
+<main class="container-fluid p-4">
+
+  <div id="message" aria-live="polite"></div>
+
+  <!-- Add / Edit Course -->
+  <div class="card p-4 mb-4">
+
+    <h4 id="formHeading">Add New Course</h4>
+
+    <form id="courseForm">
+
+      <input type="hidden" id="courseId">
+
+      <div class="row g-3">
+
+        <div class="col-md-6">
+          <label class="form-label">Course Code *</label>
+          <input
+            id="course_code"
+            class="form-control"
+            placeholder="e.g. SE-101"
+            required
+          >
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label">Course Name *</label>
+          <input
+            id="course_name"
+            class="form-control"
+            placeholder="e.g. Programming Fundamentals"
+            required
+          >
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">Semester *</label>
+          <select id="semester_id" class="form-select" required>
+            <option value="">Loading semesters...</option>
+          </select>
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">Credit Hours *</label>
+          <input
+            id="credit_hours"
+            type="number"
+            class="form-control"
+            min="1"
+            max="6"
+            value="3"
+            required
+          >
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">Assigned Teacher</label>
+          <select id="teacher_id" class="form-select">
+            <option value="">Select Teacher (Optional)</option>
+          </select>
+        </div>
+
+      </div>
+
+      <div class="mt-4">
+
+        <button type="submit" class="btn btn-primary" id="saveBtn">
+          Save Course
+        </button>
+
+        <button type="button" class="btn btn-secondary"
+                id="cancelBtn" hidden>
+          Cancel Edit
+        </button>
+
+      </div>
+
+    </form>
+
+  </div>
+
+  <!-- Courses List -->
+  <div class="card p-4">
+
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+
+      <h4 class="mb-0">Courses List</h4>
+
+      <div class="d-flex flex-wrap gap-2">
+
+        <select id="semesterFilter" class="form-select"
+                style="min-width:180px">
+          <option value="">All Semesters</option>
+        </select>
+
+        <input
+          id="searchInput"
+          class="form-control"
+          style="max-width:250px"
+          placeholder="Search course..."
+        >
+
+      </div>
+
+    </div>
+
+    <div class="table-responsive">
+
+      <table class="table table-hover align-middle">
+
+        <thead>
+          <tr>
+            <th>Course Code</th>
+            <th>Course Name</th>
+            <th>Semester</th>
+            <th>Credit Hours</th>
+            <th>Teacher</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+
+        <tbody id="coursesTable">
+          <tr>
+            <td colspan="6" class="text-center">
+              Loading courses...
+            </td>
+          </tr>
+        </tbody>
+
+      </table>
+
+    </div>
+
+  </div>
+
+</main>
+
+<script type="module">
+
+import { supabase } from './js/supabase.js';
+
+const $ = id => document.getElementById(id);
+
+let courses = [];
+let semesters = [];
+let teachers = [];
+
+// Escape HTML for safe display
+function escapeHTML(value) {
+  return String(value ?? '').replace(/[&<>"']/g, char => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  })[char]);
+}
+
+// Show messages
+function showMessage(message, type = 'success') {
+
+  $('message').innerHTML = `
+    <div class="alert alert-${type} alert-dismissible fade show">
+      ${escapeHTML(message)}
+      <button type="button" class="btn-close"
+              data-bs-dismiss="alert"></button>
+    </div>
+  `;
+
+}
+
+// Initialize page
+async function initialize() {
+
+  const { data: { user }, error: authError } =
+    await supabase.auth.getUser();
+
+  if (authError || !user) {
+    window.location.href = 'login.html';
+    return;
+  }
+
+  await loadSemesters();
+  await loadTeachers();
+  await loadCourses();
+
+}
+
+// Load semesters
+async function loadSemesters() {
+
+  const { data, error } = await supabase
+    .from('semesters')
+    .select('semester_id, semester_number, semester_name')
+    .order('semester_number');
+
+  if (error) throw error;
+
+  semesters = data || [];
+
+  const options = semesters.map(s => `
+    <option value="${s.semester_id}">
+      ${escapeHTML(
+        s.semester_name || 'Semester ' + s.semester_number
+      )}
+    </option>
+  `).join('');
+
+  $('semester_id').innerHTML =
+    '<option value="">Select Semester</option>' + options;
+
+  $('semesterFilter').innerHTML =
+    '<option value="">All Semesters</option>' + options;
+
+}
+
+// Load teachers
+async function loadTeachers() {
+
+  const { data, error } = await supabase
+    .from('teachers')
+    .select('teacher_id, full_name')
+    .order('full_name');
+
+  if (error) throw error;
+
+  teachers = data || [];
+
+  $('teacher_id').innerHTML =
+    '<option value="">Select Teacher (Optional)</option>' +
+    teachers.map(t => `
+      <option value="${t.teacher_id}">
+        ${escapeHTML(t.full_name)}
+      </option>
+    `).join('');
+
+}
+
+// Load courses
+async function loadCourses() {
+
+  $('coursesTable').innerHTML = `
+    <tr>
+      <td colspan="6" class="text-center">Loading courses...</td>
+    </tr>
+  `;
+
+  const { data, error } = await supabase
+    .from('courses')
+    .select(`
+      course_id,
+      semester_id,
+      teacher_id,
+      course_code,
+      course_name,
+      credit_hours
+    `)
+    .order('course_code');
+
+  if (error) throw error;
+
+  courses = data || [];
+
+  renderCourses();
+
+}
+
+// Render course list
+function renderCourses() {
+
+  const search = $('searchInput').value.toLowerCase();
+  const semesterFilter = $('semesterFilter').value;
+
+  const filtered = courses.filter(c => {
+
+    const teacher = teachers.find(
+      t => String(t.teacher_id) === String(c.teacher_id)
+    );
+
+    const matchesSearch = [
+      c.course_code,
+      c.course_name,
+      teacher?.full_name
+    ].some(value =>
+      String(value || '').toLowerCase().includes(search)
+    );
+
+    const matchesSemester =
+      !semesterFilter ||
+      String(c.semester_id) === String(semesterFilter);
+
+    return matchesSearch && matchesSemester;
+
+  });
+
+  if (!filtered.length) {
+
+    $('coursesTable').innerHTML = `
+      <tr>
+        <td colspan="6" class="text-center">
+          No courses found.
+        </td>
+      </tr>
+    `;
+
+    return;
+  }
+
+  $('coursesTable').innerHTML = filtered.map(c => {
+
+    const semester = semesters.find(
+      s => String(s.semester_id) === String(c.semester_id)
+    );
+
+    const teacher = teachers.find(
+      t => String(t.teacher_id) === String(c.teacher_id)
+    );
+
+    return `
+      <tr>
+
+        <td>
+          <span class="badge bg-primary">
+            ${escapeHTML(c.course_code)}
+          </span>
+        </td>
+
+        <td>${escapeHTML(c.course_name)}</td>
+
+        <td>
+          ${escapeHTML(
+            semester?.semester_name ||
+            'Semester ' + (semester?.semester_number || '')
+          )}
+        </td>
+
+        <td>
+          <span class="badge bg-success">
+            ${escapeHTML(c.credit_hours)} Credit Hours
+          </span>
+        </td>
+
+        <td>${escapeHTML(teacher?.full_name || 'Not Assigned')}</td>
+
+        <td>
+          <button
+            class="btn btn-sm btn-warning me-1"
+            data-edit="${c.course_id}">
+            Edit
+          </button>
+
+          <button
+            class="btn btn-sm btn-danger"
+            data-delete="${c.course_id}">
+            Delete
+          </button>
+        </td>
+
+      </tr>
+    `;
+
+  }).join('');
+
+}
+
+// Save or update course
+$('courseForm').addEventListener('submit', async event => {
+
+  event.preventDefault();
+
+  const id = $('courseId').value;
+
+  const creditHours = Number($('credit_hours').value);
+
+  if (!Number.isInteger(creditHours) ||
+      creditHours < 1 ||
+      creditHours > 6) {
+
+    showMessage('Credit hours 1 se 6 ke darmiyan enter karein.', 'warning');
+    return;
+  }
+
+  const payload = {
+    course_code: $('course_code').value.trim(),
+    course_name: $('course_name').value.trim(),
+    semester_id: $('semester_id').value,
+    credit_hours: creditHours,
+    teacher_id: $('teacher_id').value || null
+  };
+
+  $('saveBtn').disabled = true;
+
+  try {
+
+    if (id) {
+
+      const { error } = await supabase
+        .from('courses')
+        .update(payload)
+        .eq('course_id', id);
+
+      if (error) throw error;
+
+      showMessage('Course updated successfully.');
+
+    } else {
+
+      const { error } = await supabase
+        .from('courses')
+        .insert(payload);
+
+      if (error) throw error;
+
+      showMessage('Course added successfully.');
+
+    }
+
+    resetForm();
+    await loadCourses();
+
+  } catch (error) {
+
+    showMessage('Error: ' + error.message, 'danger');
+
+  } finally {
+
+    $('saveBtn').disabled = false;
+
+  }
+
+});
+
+// Edit and delete actions
+$('coursesTable').addEventListener('click', async event => {
+
+  const editId = event.target.dataset.edit;
+  const deleteId = event.target.dataset.delete;
+
+  if (editId) {
+
+    const course = courses.find(
+      c => String(c.course_id) === String(editId)
+    );
+
+    if (!course) return;
+
+    $('courseId').value = course.course_id;
+    $('course_code').value = course.course_code || '';
+    $('course_name').value = course.course_name || '';
+    $('semester_id').value = course.semester_id;
+    $('credit_hours').value = course.credit_hours;
+    $('teacher_id').value = course.teacher_id || '';
+
+    $('formHeading').textContent = 'Edit Course';
+    $('saveBtn').textContent = 'Update Course';
+    $('cancelBtn').hidden = false;
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  }
+
+  if (deleteId) {
+
+    const course = courses.find(
+      c => String(c.course_id) === String(deleteId)
+    );
+
+    if (!course) return;
+
+    if (!confirm(
+      `Are you sure you want to delete ${course.course_name}?`
+    )) return;
+
+    const { error } = await supabase
+      .from('courses')
+      .delete()
+      .eq('course_id', deleteId);
+
+    if (error) {
+
+      showMessage(
+        'Course delete nahi ho saka. Mumkin hai is course ke saath enrollments linked hon. Details: ' +
+        error.message,
+        'danger'
+      );
+
+    } else {
+
+      showMessage('Course deleted successfully.');
+      await loadCourses();
+
+    }
+
+  }
+
+});
+
+// Reset form
+function resetForm() {
+
+  $('courseForm').reset();
+
+  $('courseId').value = '';
+  $('credit_hours').value = 3;
+
+  $('formHeading').textContent = 'Add New Course';
+  $('saveBtn').textContent = 'Save Course';
+  $('cancelBtn').hidden = true;
+
+}
+
+$('cancelBtn').addEventListener('click', resetForm);
+
+$('searchInput').addEventListener('input', renderCourses);
+
+$('semesterFilter').addEventListener('change', renderCourses);
+
+// Start
+try {
+
+  await initialize();
+
+} catch (error) {
+
+  showMessage('Page loading error: ' + error.message, 'danger');
+
+}
+
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+</body>
+</html>
